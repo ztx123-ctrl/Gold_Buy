@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>黄金AI分析系统</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: "Microsoft YaHei", Arial, sans-serif;
+            background-color: #f5f7fb;
+        }
+
+        .container {
+            width: 90%;
+            max-width: 900px;
+            margin: 30px auto;
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 20px;
+        }
+
+        .top-bar {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .top-info {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        #liveTime {
+            font-size: 16px;
+            color: #666;
+            margin-bottom: 10px;
+        }
+
+        button {
+            padding: 12px 24px;
+            font-size: 16px;
+            border: none;
+            border-radius: 8px;
+            background-color: #2563eb;
+            color: white;
+            cursor: pointer;
+            margin: 5px;
+        }
+
+        button:hover {
+            background-color: #1d4ed8;
+        }
+
+        #loading {
+            text-align: center;
+            color: #2563eb;
+            margin: 15px 0;
+            font-weight: bold;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 16px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        }
+
+        .card h2 {
+            margin-top: 0;
+            color: #222;
+            font-size: 20px;
+            margin-bottom: 12px;
+        }
+
+        .content {
+            color: #444;
+            line-height: 1.8;
+            white-space: pre-wrap;
+        }
+
+        .price-card {
+            background: linear-gradient(135deg, #fff7cc, #ffe58f);
+            border: 2px solid #f5c542;
+        }
+
+        .price-text {
+            font-size: 32px;
+            font-weight: bold;
+            color: #b7791f;
+        }
+
+        .trend-badge {
+            display: inline-block;
+            padding: 8px 16px;
+            border-radius: 999px;
+            font-weight: bold;
+            margin-bottom: 12px;
+            color: white;
+            background-color: gray;
+        }
+
+        .trend-up {
+            background-color: #16a34a;
+        }
+
+        .trend-down {
+            background-color: #dc2626;
+        }
+
+        .trend-flat {
+            background-color: #d97706;
+        }
+
+        .signal-text {
+            font-size: 20px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .signal-buy {
+            color: #16a34a;
+        }
+
+        .signal-sell {
+            color: #dc2626;
+        }
+
+        .signal-hold {
+            color: #d97706;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>黄金AI分析系统</h1>
+
+        <div class="top-bar">
+            <button id="analyzeBtn">获取黄金分析</button>
+            <button id="historyBtn">查看历史记录</button>
+        </div>
+
+        <div class="top-info">
+            <div id="liveTime">当前时间：--</div>
+            <div id="loading"></div>
+        </div>
+
+        <div class="card price-card">
+            <h2>当前金价</h2>
+            <div id="price" class="price-text">暂无数据</div>
+        </div>
+
+        <div class="card">
+            <h2>相关新闻</h2>
+            <div id="news" class="content">暂无数据</div>
+        </div>
+
+        <div class="card">
+            <h2>新闻总结</h2>
+            <div id="summary" class="content">暂无数据</div>
+        </div>
+
+        <div class="card">
+            <h2>趋势分析</h2>
+            <div id="trendBadge" class="trend-badge">暂无判断</div>
+            <div id="signal" class="signal-text">暂无信号</div>
+            <div id="analysis" class="content">暂无数据</div>
+        </div>
+    </div>
+
+    <script>
+    function updateLiveTime() {
+        const now = new Date();
+
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, "0");
+        const day = String(now.getDate()).padStart(2, "0");
+        const hour = String(now.getHours()).padStart(2, "0");
+        const minute = String(now.getMinutes()).padStart(2, "0");
+        const second = String(now.getSeconds()).padStart(2, "0");
+
+        const timeString = `${year}-${month}-${day} ${hour}:${minute}:${second}`;
+        document.getElementById("liveTime").innerText = "当前时间：" + timeString;
+    }
+
+    // ✅ 获取金价（新增）
+    async function loadGoldPrice() {
+        try {
+            const response = await fetch("http://127.0.0.1:8001/gold_price");
+            const data = await response.json();
+
+            document.getElementById("price").innerText = data.price || "无数据";
+        } catch (error) {
+            document.getElementById("price").innerText = "获取失败";
+        }
+    }
+
+    // 初始化时间
+    updateLiveTime();
+    setInterval(updateLiveTime, 1000);
+
+    // ✅ 初始化金价 + 每分钟更新
+    loadGoldPrice();
+    setInterval(loadGoldPrice, 10000);
+
+    const btn = document.getElementById("analyzeBtn");
+    const historyBtn = document.getElementById("historyBtn");
+
+    historyBtn.addEventListener("click", function () {
+        window.location.href = "/records_page";
+    });
+
+    btn.addEventListener("click", async function () {
+        try {
+            document.getElementById("loading").innerText = "分析中，请稍候...";
+
+            document.getElementById("trendBadge").innerText = "分析中...";
+            document.getElementById("trendBadge").className = "trend-badge";
+
+            document.getElementById("signal").innerText = "信号生成中...";
+            document.getElementById("signal").className = "signal-text";
+
+            const response = await fetch("http://127.0.0.1:8001/gold_once");
+            const data = await response.json();
+
+            document.getElementById("loading").innerText = "";
+
+            document.getElementById("price").innerText = data.price || "无数据";
+            document.getElementById("news").innerText = data.news || "无数据";
+            document.getElementById("summary").innerText = data.summary || "无数据";
+            document.getElementById("analysis").innerText = data.analysis || "无数据";
+
+            const trendBadge = document.getElementById("trendBadge");
+            const signalEl = document.getElementById("signal");
+            const analysisText = data.analysis || "";
+
+            const trendLine = analysisText.match(/1\. 今日走势判断：\s*(上涨|下跌|震荡)/);
+            const trend = trendLine ? trendLine[1] : "";
+
+            signalEl.className = "signal-text";
+            trendBadge.className = "trend-badge";
+
+            if (trend === "上涨") {
+                signalEl.innerText = "🟢 建议：买入";
+                signalEl.classList.add("signal-buy");
+
+                trendBadge.innerText = "上涨";
+                trendBadge.classList.add("trend-up");
+            } else if (trend === "下跌") {
+                signalEl.innerText = "🔴 建议：卖出";
+                signalEl.classList.add("signal-sell");
+
+                trendBadge.innerText = "下跌";
+                trendBadge.classList.add("trend-down");
+            } else if (trend === "震荡") {
+                signalEl.innerText = "🟡 建议：观望";
+                signalEl.classList.add("signal-hold");
+
+                trendBadge.innerText = "震荡";
+                trendBadge.classList.add("trend-flat");
+            } else {
+                signalEl.innerText = "暂无信号";
+                trendBadge.innerText = "暂无判断";
+            }
+
+        } catch (error) {
+            document.getElementById("loading").innerText = "";
+            document.getElementById("trendBadge").innerText = "暂无判断";
+            document.getElementById("trendBadge").className = "trend-badge";
+            document.getElementById("signal").innerText = "暂无信号";
+            document.getElementById("signal").className = "signal-text";
+            alert("请求失败：" + error);
+        }
+    });
+</script>
+</body>
+</html>

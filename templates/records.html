@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>历史记录</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: "Microsoft YaHei", Arial, sans-serif;
+            background-color: #f5f7fb;
+        }
+
+        .container {
+            width: 90%;
+            max-width: 1000px;
+            margin: 30px auto;
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 20px;
+        }
+
+        .record-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 16px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        }
+
+        .record-title {
+            font-size: 20px;
+            font-weight: bold;
+            color: #222;
+            margin-bottom: 10px;
+        }
+
+        .record-time {
+            color: #666;
+            margin-bottom: 10px;
+        }
+
+        .record-section {
+            margin-top: 12px;
+        }
+
+        .record-section h3 {
+            margin: 0 0 8px 0;
+            color: #333;
+            font-size: 16px;
+        }
+
+        .record-content {
+            color: #444;
+            line-height: 1.8;
+            white-space: pre-wrap;
+        }
+        .record-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+        .delete-btn {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 6px;
+            background-color: #ef4444;
+            color: white;
+            cursor: pointer;
+        }
+
+        .delete-btn:hover {
+            background-color: #dc2626;
+        }
+
+        .toggle-btn {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 6px;
+            background-color: #3b82f6;
+            color: white;
+            cursor: pointer;
+            margin-right: 8px;
+        }
+
+        .toggle-btn:hover {
+            background-color: #2563eb;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>黄金分析历史记录</h1>
+        <div style="text-align:center; margin-bottom:20px;">
+            <button onclick="window.location.href='/'">返回主页</button>
+        </div>
+
+        <div id="recordList">加载中...</div>
+    </div>
+
+    <script>
+        async function loadRecords() {
+            try {
+                const response = await fetch("http://127.0.0.1:8001/records/latest?n=5");
+                const records = await response.json();
+
+                const recordList = document.getElementById("recordList");
+
+                if (!records || records.length === 0) {
+                    recordList.innerHTML = "<p>暂无历史记录</p>";
+                    return;
+                }
+
+                let html = "";
+
+                records.slice().reverse().forEach(record => {
+                    html += `
+                        <div class="record-card">
+                            <div class="record-header">
+                                <div class="record-title">金价：${record.price || "无数据"}</div>
+                                <div>
+                                    <button class="toggle-btn" onclick="toggleDetail('detail-${record.id}')">展开 / 收起</button>
+                                    <button class="delete-btn" onclick="deleteRecord('${record.id}')">删除</button>
+                                </div>
+                            </div>
+
+                            <div class="record-time">时间：${record.time || "无数据"}</div>
+
+                            <div id="detail-${record.id}" class="record-detail" style="display: none;">
+                                <div class="record-section">
+                                    <h3>相关新闻</h3>
+                                    <div class="record-content">${record.news || "无数据"}</div>
+                                </div>
+
+                                <div class="record-section">
+                                    <h3>新闻总结</h3>
+                                    <div class="record-content">${record.summary || "无数据"}</div>
+                                </div>
+
+                                <div class="record-section">
+                                    <h3>趋势分析</h3>
+                                    <div class="record-content">${record.analysis || "无数据"}</div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+
+                recordList.innerHTML = html;
+            } catch (error) {
+                document.getElementById("recordList").innerHTML = "<p>历史记录加载失败</p>";
+            }
+        }
+
+        async function deleteRecord(recordId) {
+            const confirmDelete = confirm("确定要删除这条记录吗？");
+
+            if (!confirmDelete) return;
+
+            try {
+                const response = await fetch(`http://127.0.0.1:8001/records/${recordId}`, {
+                    method: "DELETE"
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    alert("删除成功");
+                    loadRecords();
+                } else {
+                    alert("删除失败：" + result.message);
+                }
+            } catch (error) {
+                alert("删除请求失败：" + error);
+            }
+        }
+        function toggleDetail(detailId) {
+            const detail = document.getElementById(detailId);
+
+            if (detail.style.display === "none") {
+                detail.style.display = "block";
+            } else {
+                detail.style.display = "none";
+            }
+        }
+        loadRecords();
+    </script>
+</body>
+</html>
