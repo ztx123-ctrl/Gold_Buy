@@ -1,66 +1,85 @@
+import logging
 import time
-from langchain_openai import ChatOpenAI
-from chains.analyzer import get_gold_analysis
-from config import API_KEY, BASE_URL
-from tools.news import get_gold_news
-from tools.gold_price import get_gold_price
-from prompts.gold_prompt import build_gold_full_prompt
-from storage.record_manager import build_record, save_record
 from datetime import datetime
-from chains.parser import parse_result
+from threading import Lock
+from uuid import uuid4
 
-def run_gold_analysis_once():
-    total_start = time.time()
+from chains.analysis_chain import run_analysis_chain
+from chains.input_builder import build_analysis_input
+from config import settings
+from schemas import AnalysisRecord, AnalysisStatus, Trend
+from storage.record_manager import init_storage, save_record
+from tools.gold_price import get_gold_price
+from tools.news import get_gold_news
 
-    llm = ChatOpenAI(
-        model="qwen3.6-plus",
-        api_key=API_KEY,
-        base_url=BASE_URL,
-    )
 
-    t1 = time.time()
-    price = get_gold_price()
-    print("获取金价耗时:", time.time() - t1)
+logger = logging.getLogger(__name__)
+RUN_LOCK = Lock()
 
-    t2 = time.time()
-    news = get_gold_news()
-    print("获取新闻耗时:", time.time() - t2)
 
-    t3 = time.time()
-    prompt = build_gold_full_prompt(price, news)
-    result = get_gold_analysis(llm, prompt)
-    parsed = parse_result(result)
-    summary = parsed["summary"]
-    analysis = parsed["analysis"]
-    print("单次分析耗时:", time.time() - t3)
+def _resolve_status(*, price_ok: bool, news_ok: bool, output_ok: bool) -> AnalysisStatus:
+    if price_ok and news_ok and output_ok:
+        return AnalysisStatus.SUCCESS
+    if output_ok and (price_ok or news_ok):
+        return AnalysisStatus.PARTIAL
+    return AnalysisStatus.FAILED
 
-    now = datetime.now()
-    time_str = now.strftime("%Y-%m-%d %H:%M:%S")
 
-    record = build_record(price, news, summary, analysis)
-    save_record(record)
+def run_gold_analysis_once(source: str = "manual") -> AnalysisRecord:
+    with RUN_LOCK:
+        init_storage()
+        started = time.perf_counter()
+        errors: list[str] = []
 
-    with open("gold_report.txt", "a", encoding="utf-8") as f:
-        f.write("====\n")
-        f.write("黄金市场分析报告\n")
-        f.write(f"时间: {time_str}\n")
-        f.write(f"金价: {price}\n")
-        f.write("新闻原文:\n")
+        price_raw = get_gold_price()
+        news = get_gold_news(limit=settings.news_limit)
 
-        if isinstance(news, list):
-            f.write("\n".join(news) + "\n")
+        if price_raw == "N/A":
+            errors.append("金价抓取失败")
+        if not news:
+            errors.append("新闻抓取为空")
+
+        analysis_input = build_analysis_input(price_raw=price_raw, news=news, source=source)
+        raw_output = ""
+        llm_output = None
+
+        if analysis_input.price_value is not None or analysis_input.news:
+            llm_output, raw_output, parse_error = run_analysis_chain(analysis_input)
+            if parse_error:
+                errors.append(f"模型解析失败: {parse_error}")
         else:
-            f.write(str(news) + "\n")
+            raw_output = "数据源全部失败，未调用模型"
 
-        f.write("综合分析结果:\n")
-        f.write(f"{result}\n\n")
+        if llm_output and not llm_output.summary:
+            errors.append("模型未返回有效摘要")
 
-    print("总耗时:", time.time() - total_start)
+        latency_ms = int((time.perf_counter() - started) * 1000)
+        status = _resolve_status(
+            price_ok=analysis_input.price_value is not None,
+            news_ok=bool(analysis_input.news),
+            output_ok=llm_output is not None and bool(llm_output.summary or llm_output.reasons or llm_output.advice),
+        )
 
-    return {
-        "price": price,
-        "news": news,
-        "summary": summary,
-        "analysis": analysis,
-        "time": time_str
-    }
+        now = datetime.now()
+        record = AnalysisRecord(
+            id=str(uuid4()),
+            time=now.strftime("%Y-%m-%d %H:%M:%S"),
+            source=analysis_input.source,
+            status=status,
+            price_raw=analysis_input.price_raw,
+            price_value=analysis_input.price_value,
+            news=analysis_input.news,
+            summary=llm_output.summary if llm_output else "暂无总结",
+            trend=llm_output.trend if llm_output else Trend.UNKNOWN,
+            reasons=llm_output.reasons if llm_output else [],
+            advice=llm_output.advice if llm_output else "暂无建议",
+            raw_output=raw_output,
+            model_name=settings.model_name,
+            prompt_version=settings.prompt_version,
+            latency_ms=latency_ms,
+            error="; ".join(errors) if errors else None,
+            input_snapshot=analysis_input.model_dump(mode="json"),
+        )
+        save_record(record)
+        logger.info("Analysis finished status=%s latency_ms=%s", record.status.value, record.latency_ms)
+        return record

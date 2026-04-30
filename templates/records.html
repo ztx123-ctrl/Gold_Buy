@@ -2,192 +2,232 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>历史记录</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>黄金分析历史记录</title>
     <style>
+        :root {
+            --bg: #f7f1e6;
+            --panel: rgba(255, 250, 241, 0.94);
+            --border: #e6d6b8;
+            --text: #2f2417;
+            --subtle: #7b6a58;
+            --accent: #9b6b16;
+            --danger: #b42318;
+        }
+        * { box-sizing: border-box; }
         body {
             margin: 0;
-            padding: 0;
-            font-family: "Microsoft YaHei", Arial, sans-serif;
-            background-color: #f5f7fb;
+            font-family: "Microsoft YaHei", sans-serif;
+            color: var(--text);
+            background: linear-gradient(180deg, #fbf6ee 0%, var(--bg) 100%);
         }
-
         .container {
-            width: 90%;
-            max-width: 1000px;
-            margin: 30px auto;
+            width: min(1080px, calc(100% - 28px));
+            margin: 24px auto 40px;
         }
-
-        h1 {
-            text-align: center;
-            color: #333;
-            margin-bottom: 20px;
+        .header, .record-card {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 22px;
+            box-shadow: 0 16px 50px rgba(89, 61, 19, 0.08);
         }
-
+        .header {
+            padding: 24px;
+            margin-bottom: 18px;
+        }
+        h1 { margin: 0 0 8px; }
+        .subtle { color: var(--subtle); }
+        .toolbar, .record-header, .actions {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+        }
+        button, a {
+            border: none;
+            border-radius: 999px;
+            padding: 10px 18px;
+            text-decoration: none;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .primary {
+            background: rgba(155, 107, 22, 0.12);
+            color: var(--accent);
+        }
+        .danger {
+            background: rgba(180, 35, 24, 0.12);
+            color: var(--danger);
+        }
         .record-card {
-            background: white;
-            border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 16px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            padding: 18px 20px;
+            margin-bottom: 14px;
         }
-
         .record-title {
-            font-size: 20px;
-            font-weight: bold;
-            color: #222;
-            margin-bottom: 10px;
+            font-size: 22px;
+            font-weight: 700;
         }
-
-        .record-time {
-            color: #666;
-            margin-bottom: 10px;
+        .meta {
+            color: var(--subtle);
+            margin-top: 6px;
         }
-
-        .record-section {
-            margin-top: 12px;
-        }
-
-        .record-section h3 {
-            margin: 0 0 8px 0;
-            color: #333;
-            font-size: 16px;
-        }
-
-        .record-content {
-            color: #444;
-            line-height: 1.8;
-            white-space: pre-wrap;
-        }
-        .record-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 10px;
-}
-
-        .delete-btn {
+        .badge {
+            display: inline-flex;
             padding: 6px 12px;
-            border: none;
-            border-radius: 6px;
-            background-color: #ef4444;
-            color: white;
-            cursor: pointer;
+            border-radius: 999px;
+            color: #fff;
+            font-size: 12px;
+            font-weight: 700;
+            margin-left: 8px;
         }
-
-        .delete-btn:hover {
-            background-color: #dc2626;
+        .up { background: #1d7a43; }
+        .down { background: #b42318; }
+        .flat { background: #b8700c; }
+        .unknown { background: #667085; }
+        .success { background: #166534; }
+        .partial { background: #b45309; }
+        .failed { background: #991b1b; }
+        .record-detail {
+            display: none;
+            margin-top: 16px;
+            border-top: 1px solid var(--border);
+            padding-top: 16px;
         }
-
-        .toggle-btn {
-            padding: 6px 12px;
-            border: none;
-            border-radius: 6px;
-            background-color: #3b82f6;
-            color: white;
-            cursor: pointer;
-            margin-right: 8px;
+        .section { margin-top: 12px; }
+        .section-title { font-weight: 700; margin-bottom: 8px; }
+        ul { margin: 8px 0 0; padding-left: 18px; }
+        .empty {
+            text-align: center;
+            padding: 28px;
+            color: var(--subtle);
         }
-
-        .toggle-btn:hover {
-            background-color: #2563eb;
+        @media (max-width: 640px) {
+            .container { width: calc(100% - 18px); }
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>黄金分析历史记录</h1>
-        <div style="text-align:center; margin-bottom:20px;">
-            <button onclick="window.location.href='/'">返回主页</button>
+        <div class="header">
+            <h1>黄金分析历史记录</h1>
+            <div class="subtle">最近 20 条结构化分析记录，可查看详情或删除。</div>
+            <div class="toolbar" style="margin-top: 16px;">
+                <a class="primary" href="/">返回首页</a>
+                <button class="primary" onclick="loadRecords()">刷新记录</button>
+            </div>
         </div>
 
-        <div id="recordList">加载中...</div>
+        <div id="recordList" class="empty">加载中...</div>
     </div>
 
     <script>
-        async function loadRecords() {
-            try {
-                const response = await fetch("http://127.0.0.1:8001/records/latest?n=5");
-                const records = await response.json();
-
-                const recordList = document.getElementById("recordList");
-
-                if (!records || records.length === 0) {
-                    recordList.innerHTML = "<p>暂无历史记录</p>";
-                    return;
-                }
-
-                let html = "";
-
-                records.slice().reverse().forEach(record => {
-                    html += `
-                        <div class="record-card">
-                            <div class="record-header">
-                                <div class="record-title">金价：${record.price || "无数据"}</div>
-                                <div>
-                                    <button class="toggle-btn" onclick="toggleDetail('detail-${record.id}')">展开 / 收起</button>
-                                    <button class="delete-btn" onclick="deleteRecord('${record.id}')">删除</button>
-                                </div>
-                            </div>
-
-                            <div class="record-time">时间：${record.time || "无数据"}</div>
-
-                            <div id="detail-${record.id}" class="record-detail" style="display: none;">
-                                <div class="record-section">
-                                    <h3>相关新闻</h3>
-                                    <div class="record-content">${record.news || "无数据"}</div>
-                                </div>
-
-                                <div class="record-section">
-                                    <h3>新闻总结</h3>
-                                    <div class="record-content">${record.summary || "无数据"}</div>
-                                </div>
-
-                                <div class="record-section">
-                                    <h3>趋势分析</h3>
-                                    <div class="record-content">${record.analysis || "无数据"}</div>
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                });
-
-                recordList.innerHTML = html;
-            } catch (error) {
-                document.getElementById("recordList").innerHTML = "<p>历史记录加载失败</p>";
+        function unwrap(response) {
+            if (!response.success) {
+                throw new Error(response.error || "请求失败");
             }
+            return response.data;
+        }
+
+        function trendClass(trend) {
+            return {
+                "上涨": "up",
+                "下跌": "down",
+                "震荡": "flat",
+                "未知": "unknown"
+            }[trend] || "unknown";
+        }
+
+        function statusClass(status) {
+            return {
+                "success": "success",
+                "partial": "partial",
+                "failed": "failed"
+            }[status] || "failed";
+        }
+
+        function toggleDetail(id) {
+            const element = document.getElementById(id);
+            element.style.display = element.style.display === "block" ? "none" : "block";
         }
 
         async function deleteRecord(recordId) {
-            const confirmDelete = confirm("确定要删除这条记录吗？");
-
-            if (!confirmDelete) return;
-
+            if (!confirm("确定要删除这条记录吗？")) {
+                return;
+            }
             try {
-                const response = await fetch(`http://127.0.0.1:8001/records/${recordId}`, {
-                    method: "DELETE"
-                });
-
+                const response = await fetch(`/api/records/${recordId}`, { method: "DELETE" });
                 const result = await response.json();
-
-                if (result.success) {
-                    alert("删除成功");
-                    loadRecords();
-                } else {
-                    alert("删除失败：" + result.message);
+                if (!result.success) {
+                    throw new Error(result.error || "删除失败");
                 }
+                alert(result.data.message);
+                loadRecords();
             } catch (error) {
-                alert("删除请求失败：" + error);
+                alert(error.message || "删除请求失败");
             }
         }
-        function toggleDetail(detailId) {
-            const detail = document.getElementById(detailId);
 
-            if (detail.style.display === "none") {
-                detail.style.display = "block";
-            } else {
-                detail.style.display = "none";
+        async function loadRecords() {
+            const container = document.getElementById("recordList");
+            container.innerHTML = "加载中...";
+            try {
+                const response = await fetch("/api/records/latest?n=20");
+                const records = unwrap(await response.json());
+                if (!records || records.length === 0) {
+                    container.innerHTML = '<div class="empty">暂无历史记录</div>';
+                    return;
+                }
+                container.innerHTML = records.map((record, index) => `
+                    <div class="record-card">
+                        <div class="record-header">
+                            <div>
+                                <div class="record-title">金价 ${record.price_raw || "--"}</div>
+                                <div class="meta">
+                                    ${record.time || "--"} ｜ ${record.source || "--"} ｜ ${record.model_name || "--"}
+                                    <span class="badge ${trendClass(record.trend)}">${record.trend || "未知"}</span>
+                                    <span class="badge ${statusClass(record.status)}">${record.status || "failed"}</span>
+                                </div>
+                            </div>
+                            <div class="actions">
+                                <button class="primary" onclick="toggleDetail('detail-${index}')">展开 / 收起</button>
+                                <button class="danger" onclick="deleteRecord('${record.id}')">删除</button>
+                            </div>
+                        </div>
+
+                        <div id="detail-${index}" class="record-detail">
+                            <div class="section">
+                                <div class="section-title">新闻摘要</div>
+                                <div>${record.summary || "暂无总结"}</div>
+                            </div>
+
+                            <div class="section">
+                                <div class="section-title">相关新闻</div>
+                                <ul>${(record.news || []).map((item) => `<li>${item.title}</li>`).join("") || "<li>暂无相关新闻</li>"}</ul>
+                            </div>
+
+                            <div class="section">
+                                <div class="section-title">原因分析</div>
+                                <ul>${(record.reasons || []).map((item) => `<li>${item}</li>`).join("") || "<li>暂无原因</li>"}</ul>
+                            </div>
+
+                            <div class="section">
+                                <div class="section-title">操作建议</div>
+                                <div>${record.advice || "暂无建议"}</div>
+                            </div>
+
+                            <div class="section">
+                                <div class="section-title">错误信息</div>
+                                <div>${record.error || "无"}</div>
+                            </div>
+                        </div>
+                    </div>
+                `).join("");
+            } catch (error) {
+                container.innerHTML = `<div class="empty">${error.message || "历史记录加载失败"}</div>`;
             }
         }
+
         loadRecords();
     </script>
 </body>
