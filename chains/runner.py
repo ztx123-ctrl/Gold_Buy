@@ -43,6 +43,7 @@ def run_gold_analysis_once(source: str = "manual") -> AnalysisRecord:
         raw_output = ""
         llm_output = None
 
+        parse_error: str | None = None
         if analysis_input.price_value is not None or analysis_input.news:
             llm_output, raw_output, parse_error = run_analysis_chain(analysis_input)
             if parse_error:
@@ -53,11 +54,18 @@ def run_gold_analysis_once(source: str = "manual") -> AnalysisRecord:
         if llm_output and not llm_output.summary:
             errors.append("模型未返回有效摘要")
 
+        output_ok = (
+            parse_error is None
+            and llm_output is not None
+            and llm_output.summary not in ("", "暂无总结")
+            and bool(llm_output.reasons)
+        )
+
         latency_ms = int((time.perf_counter() - started) * 1000)
         status = _resolve_status(
             price_ok=analysis_input.price_value is not None,
             news_ok=bool(analysis_input.news),
-            output_ok=llm_output is not None and bool(llm_output.summary or llm_output.reasons or llm_output.advice),
+            output_ok=output_ok,
         )
 
         now = datetime.now()
@@ -74,11 +82,13 @@ def run_gold_analysis_once(source: str = "manual") -> AnalysisRecord:
             reasons=llm_output.reasons if llm_output else [],
             advice=llm_output.advice if llm_output else "暂无建议",
             raw_output=raw_output,
-            model_name=settings.model_name,
+            model_name=("mock" if settings.mock_llm else settings.model_name),
             prompt_version=settings.prompt_version,
             latency_ms=latency_ms,
             error="; ".join(errors) if errors else None,
             input_snapshot=analysis_input.model_dump(mode="json"),
+            confidence=llm_output.confidence if llm_output else None,
+            news_count=len(analysis_input.news),
         )
         save_record(record)
         logger.info("Analysis finished status=%s latency_ms=%s", record.status.value, record.latency_ms)

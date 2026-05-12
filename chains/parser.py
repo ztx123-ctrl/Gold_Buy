@@ -10,16 +10,23 @@ TREND_MAPPING = {
     "上涨": Trend.UP,
     "上升": Trend.UP,
     "偏强": Trend.UP,
+    "走强": Trend.UP,
+    "看涨": Trend.UP,
     "下跌": Trend.DOWN,
     "下降": Trend.DOWN,
     "偏弱": Trend.DOWN,
+    "走弱": Trend.DOWN,
+    "看跌": Trend.DOWN,
     "震荡": Trend.FLAT,
     "持平": Trend.FLAT,
+    "平": Trend.FLAT,
     "盘整": Trend.FLAT,
+    "横盘": Trend.FLAT,
     "未知": Trend.UNKNOWN,
     "up": Trend.UP,
     "down": Trend.DOWN,
     "flat": Trend.FLAT,
+    "neutral": Trend.FLAT,
     "unknown": Trend.UNKNOWN,
 }
 
@@ -58,7 +65,12 @@ def parse_result(result: str) -> tuple[AnalysisLLMOutput, str | None]:
     if not payload:
         return AnalysisLLMOutput(), "模型输出为空或缺少 JSON 对象"
 
-    payload["trend"] = TREND_MAPPING.get(str(payload.get("trend", "")).strip(), Trend.UNKNOWN)
+    raw_trend = str(payload.get("trend", "")).strip()
+    payload["trend"] = (
+        TREND_MAPPING.get(raw_trend)
+        or TREND_MAPPING.get(raw_trend.lower())
+        or Trend.UNKNOWN
+    )
     reasons = payload.get("reasons", [])
     if isinstance(reasons, str):
         reasons = [item.strip("- ").strip() for item in reasons.splitlines() if item.strip()]

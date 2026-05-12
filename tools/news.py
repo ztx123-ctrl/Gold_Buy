@@ -2,6 +2,7 @@ import re
 
 import requests
 
+from instruments import current_instrument
 from schemas import NewsItem
 
 
@@ -17,7 +18,7 @@ def get_gold_news(limit: int = 3) -> list[NewsItem]:
 
         pattern = re.compile(r'<a[^>]*href="(.*?)"[^>]*>(.*?)</a>', re.S)
         news_list = re.findall(pattern, html)
-        keywords = ["黄金", "金价", "贵金属"]
+        keywords = list(current_instrument().news_keywords) or ["黄金", "金价", "贵金属"]
 
         result: list[NewsItem] = []
         seen: set[str] = set()

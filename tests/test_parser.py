@@ -39,6 +39,22 @@ class ParseResultTests(unittest.TestCase):
         self.assertIsNone(error)
         self.assertEqual(result.trend, Trend.DOWN)
 
+    def test_parse_confidence_range(self):
+        payload = '{"summary":"x","trend":"震荡","reasons":[],"advice":"y","confidence":1.4}'
+        result, error = parse_result(payload)
+        self.assertIsNone(error)
+        self.assertEqual(result.confidence, 1.0)
+
+    def test_parse_confidence_negative(self):
+        payload = '{"summary":"x","trend":"震荡","reasons":[],"advice":"y","confidence":-0.2}'
+        result, _ = parse_result(payload)
+        self.assertEqual(result.confidence, 0.0)
+
+    def test_parse_confidence_missing(self):
+        payload = '{"summary":"x","trend":"震荡","reasons":[],"advice":"y"}'
+        result, _ = parse_result(payload)
+        self.assertIsNone(result.confidence)
+
 
 if __name__ == "__main__":
     unittest.main()

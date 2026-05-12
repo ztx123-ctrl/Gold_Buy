@@ -1,9 +1,11 @@
+import json
 import logging
 
 from langchain_core.output_parsers import StrOutputParser
 from langchain_openai import ChatOpenAI
 
 from chains.input_builder import news_to_text
+from chains.mock_llm import build_mock_output
 from chains.parser import parse_result
 from config import settings
 from prompts.gold_prompt import build_analysis_prompt
@@ -34,6 +36,12 @@ def _build_payload(analysis_input: AnalysisInput) -> dict:
 
 
 def run_analysis_chain(analysis_input: AnalysisInput) -> tuple[AnalysisLLMOutput, str, str | None]:
+    if settings.mock_llm:
+        mock_payload = build_mock_output(analysis_input)
+        raw_output = json.dumps(mock_payload, ensure_ascii=False)
+        parsed_output, parse_error = parse_result(raw_output)
+        return parsed_output, raw_output, parse_error
+
     chain = build_analysis_prompt() | build_llm() | StrOutputParser()
     raw_output = chain.invoke(_build_payload(analysis_input))
     parsed_output, parse_error = parse_result(raw_output)

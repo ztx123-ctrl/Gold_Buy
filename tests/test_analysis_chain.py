@@ -4,6 +4,7 @@ from unittest.mock import patch
 from langchain_core.runnables import RunnableLambda
 
 from chains.analysis_chain import run_analysis_chain
+from config import settings
 from schemas import AnalysisInput, NewsItem, Trend
 
 
@@ -14,6 +15,11 @@ class AnalysisChainTests(unittest.TestCase):
             price_value=3300.5,
             news=[NewsItem(title="黄金短线走强", source="test")],
         )
+        self._mock_flag_original = settings.mock_llm
+        settings.mock_llm = False
+
+    def tearDown(self):
+        settings.mock_llm = self._mock_flag_original
 
     def test_single_call_returns_valid_json(self):
         call_count = {"count": 0}
